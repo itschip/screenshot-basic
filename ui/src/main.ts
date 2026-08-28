@@ -16,6 +16,8 @@ class ScreenshotRequest {
 class ScreenshotUI {
   gameView: any;
   queue: Promise<void> = Promise.resolve();
+  // just to prevent excessive waiting after the first capture
+  hasWaitedForInitialFrames = false;
 
   initialize() {
     window.addEventListener("message", (event) => {
@@ -71,8 +73,12 @@ class ScreenshotUI {
     let imageData: string | Blob;
 
     try {
-      // wwait for the FiveM WebGL hook to populate the game framebuffer
-      await this.waitForFrames(3);
+      // wait for the FiveM WebGL hook to populate the game framebuffer
+      if (!this.hasWaitedForInitialFrames) {
+        // value of 5 is random, but hopefully enough for lower spec machines as well
+        await this.waitForFrames(5);
+        this.hasWaitedForInitialFrames = true;
+      }
       imageData = request.targetField
         ? await this.canvasToBlob(canvas, type, request.quality)
         : canvas.toDataURL(type, request.quality);

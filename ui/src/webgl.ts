@@ -121,7 +121,7 @@ export function createGameView(canvas: HTMLCanvasElement) {
 
   let render = () => {};
 
-  function createStuff() {
+  function setupRenderer() {
     const tex = createTexture(gl);
     const { program, vloc, tloc } = createProgram(gl);
     const { vertexBuff, texBuff } = createBuffers(gl);
@@ -182,7 +182,7 @@ export function createGameView(canvas: HTMLCanvasElement) {
     gameView.animationFrame = requestAnimationFrame(render);
   };
 
-  createStuff();
+  setupRenderer();
 
   return gameView;
 }
