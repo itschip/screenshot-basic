@@ -1,4 +1,8 @@
-import { createGameView } from "./webgl";
+declare class CfxGameViewRenderer {
+  constructor(canvas: HTMLCanvasElement);
+  resize(width: number, height: number): void;
+  destroy(): void;
+}
 
 class ScreenshotRequest {
   encoding: "jpg" | "png" | "webp";
@@ -14,10 +18,8 @@ class ScreenshotRequest {
 }
 
 class ScreenshotUI {
-  gameView: any;
+  gameView: CfxGameViewRenderer | null = null;
   queue: Promise<void> = Promise.resolve();
-  // just to prevent excessive waiting after the first capture
-  hasWaitedForInitialFrames = false;
 
   initialize() {
     window.addEventListener("message", (event) => {
@@ -44,6 +46,12 @@ class ScreenshotUI {
   }
 
   async handleRequest(request: ScreenshotRequest) {
+    if (typeof CfxGameViewRenderer === "undefined") {
+      throw new Error(
+        "CfxGameViewRenderer is unavailable; update your FiveM client.",
+      );
+    }
+
     let type = "image/png";
 
     switch (request.encoding) {
@@ -66,25 +74,30 @@ class ScreenshotUI {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const gameView = createGameView(canvas);
-    gameView.resize(canvas.width, canvas.height);
+    const gameView = new CfxGameViewRenderer(canvas);
     this.gameView = gameView;
 
     let imageData: string | Blob;
 
     try {
-      // wait for the FiveM WebGL hook to populate the game framebuffer
-      if (!this.hasWaitedForInitialFrames) {
-        // value of 5 is random, but hopefully enough for lower spec machines as well
-        await this.waitForFrames(5);
-        this.hasWaitedForInitialFrames = true;
-      }
+      gameView.resize(canvas.width, canvas.height);
+      // Each new renderer needs frames for the game texture to become available.
+      await this.waitForFrames(5);
       imageData = request.targetField
         ? await this.canvasToBlob(canvas, type, request.quality)
         : canvas.toDataURL(type, request.quality);
     } finally {
-      gameView.dispose();
+      gameView.destroy();
       this.gameView = null;
+
+      // destroy() stops rendering but does not release the WebGL context.
+      const gl = canvas.getContext("webgl2");
+      if (gl && "getExtension" in gl) {
+        const ext = gl.getExtension("WEBGL_lose_context");
+        if (ext) {
+          ext.loseContext();
+        }
+      }
     }
 
     const getFormData = () => {
