@@ -81,23 +81,12 @@ class ScreenshotUI {
 
     try {
       gameView.resize(canvas.width, canvas.height);
-      // Each new renderer needs frames for the game texture to become available.
-      await this.waitForFrames(5);
       imageData = request.targetField
         ? await this.canvasToBlob(canvas, type, request.quality)
         : canvas.toDataURL(type, request.quality);
     } finally {
       gameView.destroy();
       this.gameView = null;
-
-      // destroy() stops rendering but does not release the WebGL context.
-      const gl = canvas.getContext("webgl2");
-      if (gl && "getExtension" in gl) {
-        const ext = gl.getExtension("WEBGL_lose_context");
-        if (ext) {
-          ext.loseContext();
-        }
-      }
     }
 
     const getFormData = () => {
@@ -158,26 +147,6 @@ class ScreenshotUI {
     });
   }
 
-  // useful as some clients report black images on the first capture from
-  // client exports
-  // usually not an issue through server exports
-  waitForFrames(count: number): Promise<void> {
-    return new Promise((resolve) => {
-      let framesWaited = 0;
-
-      const waitFrame = () => {
-        framesWaited++;
-
-        if (framesWaited >= count) {
-          resolve();
-        } else {
-          requestAnimationFrame(waitFrame);
-        }
-      };
-
-      requestAnimationFrame(waitFrame);
-    });
-  }
 }
 
 const ui = new ScreenshotUI();
